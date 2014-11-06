@@ -11,5 +11,7 @@
         string Slug { get; set; }
 
         string Content { get; set; }
+
+        IEnumerable<ConversionProblem> Problems { get; }
     }
 }

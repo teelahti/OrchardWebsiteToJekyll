@@ -1,11 +1,17 @@
 namespace KsxWebsiteToJekyll
 {
     using System;
+    using System.Collections.Generic;
     using System.Globalization;
 
     internal class KsxBlogPost : KsxDocument
     {
         public DateTime Date { get; set; }
+
+        public List<BlogComment> Comments
+        {
+            get; private set;
+        }
 
         public string NewSlug
         {
@@ -17,6 +23,11 @@ namespace KsxWebsiteToJekyll
                     this.Date, 
                     this.Slug);
             }
+        }
+
+        public KsxBlogPost()
+        {
+            this.Comments = new List<BlogComment>();
         }
 
         public override string ToString()

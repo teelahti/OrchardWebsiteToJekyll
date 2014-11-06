@@ -1,6 +1,7 @@
 namespace KsxWebsiteToJekyll
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.Globalization;
     using System.IO;
@@ -9,6 +10,8 @@ namespace KsxWebsiteToJekyll
     using System.Web;
 
     using Fizzler.Systems.HtmlAgilityPack;
+
+    using HtmlAgilityPack;
 
     internal static class KsxParser
     {
@@ -31,6 +34,30 @@ namespace KsxWebsiteToJekyll
                                                    Date = DateTime.Parse(date.InnerText, new CultureInfo("fi-FI"))
                                                };
 
+                // Parse blog comments
+                var commentsNode = document.QuerySelector("#comments");
+                if (commentsNode != null)
+                {
+                    var commentsDoc = new HtmlDocument();
+                    commentsDoc.LoadHtml(commentsNode.OuterHtml);
+
+                    var node = commentsDoc.DocumentNode;
+
+                    var whos = node.QuerySelectorAll(".who").Select(ExtractText).ToList();
+                    var whens = node.QuerySelectorAll("time").Select(s => s.Attributes["datetime"].Value).ToList();
+                    var texts = node.QuerySelectorAll(".text").Select(ExtractText).ToList();
+
+                    // TODO: Include all required disqus comments meta information in post https://help.disqus.com/customer/portal/articles/472150-custom-xml-import-format
+                    var comments = whos.Zip(whens, (who, when) => new BlogComment(who, when, null))
+                            .Zip(texts, (comment, s) =>
+                            {
+                                comment.Text = s;
+                                return comment;
+                            });
+
+                    blogPost.Comments.AddRange(comments);
+                }
+
                 result = blogPost;
             }
 
@@ -51,14 +78,16 @@ namespace KsxWebsiteToJekyll
                 .ToList();
 
             // TODO: Parse galleries, use http://dimsemenov.com/plugins/magnific-popup/documentation.html
-            // TODO: If content item is not known, write an error
-            // TODO: Parse comments
-            // TODO: Remove span .mso -extras
 
             return result;
         }
 
-        static string StripHeaderAndFooterFromContent(this string content)
+        private static string ExtractText(HtmlNode s)
+        {
+            return HttpUtility.HtmlDecode(s.InnerText).Trim();
+        }
+
+        private static string StripHeaderAndFooterFromContent(this string content)
         {
             const string HeaderEndTag = "</header>";
             var headerEnd = content.IndexOf(HeaderEndTag, StringComparison.OrdinalIgnoreCase) + HeaderEndTag.Length;

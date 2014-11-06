@@ -27,6 +27,8 @@
             Directory.CreateDirectory(postsFolder);
             Directory.CreateDirectory(imagesFolder);
 
+            var allComments = new List<BlogComment>();
+
             // Use encoding that does not emit BOM, otherwise Jekyll will fail
             var encoding = new UTF8Encoding(false);
 
@@ -42,6 +44,8 @@
                             Path.Combine(postsFolder, blogPost.NewSlug + ".md"), 
                             blogPost.ToString(),
                             encoding);
+                        
+                        allComments.AddRange(blogPost.Comments);
                     }
 
                     var page = parsed as KsxPage;
@@ -53,10 +57,20 @@
                             encoding);
                     }
 
-                    // TODO: Copy images
-                    // TODO: Output comments.xml for disqus use        
-                    Console.WriteLine("Converted: " + file.FileInfo.Name);
+                    // TODO: Copy images     
+
+                    var problems = string.Join(Environment.NewLine, parsed.Problems);
+
+                    Console.WriteLine(
+                        "Converted: " + file.FileInfo.Name 
+                        + (string.IsNullOrEmpty(problems) ? "" : Environment.NewLine + problems));
                 });
+
+            // TODO: Output comments.xml for disqus use  
+            foreach (var comment in allComments)
+            {
+                Console.WriteLine("{0} {1}", comment.When, comment.Who);
+            }
 
             Console.WriteLine("\r\nDone, press ENTER to exit");
             Console.ReadLine();
