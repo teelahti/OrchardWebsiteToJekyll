@@ -15,7 +15,7 @@ namespace KsxWebsiteToJekyll
 
     internal static class KsxParser
     {
-        internal static IKsxDocument Parse(SourceDocument source)
+        internal static IKsxDocument Parse(SourceDocument source, string[] sourceImageGalleries)
         {
             var document = source.Document.DocumentNode;
             var date = document.QuerySelector("div.published");
@@ -68,16 +68,13 @@ namespace KsxWebsiteToJekyll
             result.Content =
                 document.QuerySelector("#layout-main").InnerHtml
                     .StripHeaderAndFooterFromContent()
-                    .ConvertToMarkdown();
-
-            // TODO: Replace image paths
+                    .ConvertToMarkdown()
+                    .ReplaceImagePaths(sourceImageGalleries, "/images");
 
             // Parse tags
             result.Tags = document.QuerySelectorAll("p.tags>a")
                 .Select(t => HttpUtility.HtmlDecode(t.InnerHtml))
                 .ToList();
-
-            // TODO: Parse galleries, use http://dimsemenov.com/plugins/magnific-popup/documentation.html
 
             return result;
         }
@@ -89,11 +86,11 @@ namespace KsxWebsiteToJekyll
 
         private static string StripHeaderAndFooterFromContent(this string content)
         {
-            const string HeaderEndTag = "</header>";
-            var headerEnd = content.IndexOf(HeaderEndTag, StringComparison.OrdinalIgnoreCase) + HeaderEndTag.Length;
+            const string headerEndTag = "</header>";
+            var headerEnd = content.IndexOf(headerEndTag, StringComparison.OrdinalIgnoreCase) + headerEndTag.Length;
 
-            const string FooterStartTag = "<p class=\"tags\">";
-            var footerStart = content.IndexOf(FooterStartTag, StringComparison.OrdinalIgnoreCase);
+            const string footerStartTag = "<p class=\"tags\">";
+            var footerStart = content.IndexOf(footerStartTag, StringComparison.OrdinalIgnoreCase);
 
             if (footerStart == -1)
             {
@@ -133,7 +130,7 @@ namespace KsxWebsiteToJekyll
 
             p.Start();
 
-            string outputString = "";
+            string outputString;
             byte[] inputBuffer = Encoding.UTF8.GetBytes(htmlContent);
             p.StandardInput.BaseStream.Write(inputBuffer, 0, inputBuffer.Length);
             p.StandardInput.Close();
@@ -145,6 +142,11 @@ namespace KsxWebsiteToJekyll
             }
 
             return outputString;
+        }
+
+        static string ReplaceImagePaths(this string markdownContent, IEnumerable<string> sourceImageGalleries, string newImageFolder)
+        {
+            return sourceImageGalleries.Aggregate(markdownContent, (current, s) => current.Replace(@"/" + s, newImageFolder));
         }
     }
 }

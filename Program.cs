@@ -9,6 +9,8 @@
 
     class Program
     {
+        private static readonly string[] SourceImageGalleries = { @"Media\Default\BlogPost\blog", @"Media\Default\Page", @"Media\Default\ImageGalleries" };
+
         static void Main(string[] args)
         {
             if (args.Length != 2)
@@ -17,6 +19,8 @@
                     Path.GetFileName(Assembly.GetEntryAssembly().Location));
                 return;
             }
+
+            var source = args[0];
 
             // Create necessary folders
             string baseFolder = args[1];
@@ -27,53 +31,81 @@
             Directory.CreateDirectory(postsFolder);
             Directory.CreateDirectory(imagesFolder);
 
-            var allComments = new List<BlogComment>();
-
             // Use encoding that does not emit BOM, otherwise Jekyll will fail
             var encoding = new UTF8Encoding(false);
+            var imageGalleriesHref = SourceImageGalleries.Select(s => s.Replace(@"\", "/")).ToArray();
 
-            EnumerateFiles(args[0]).AsParallel().ForAll(
+            var comments = new DisqusBuilder();
+
+            EnumerateFiles(source).AsParallel().ForAll(
                 file =>
                 {
-                    var parsed = KsxParser.Parse(file);
+                    var parsed = KsxParser.Parse(file, imageGalleriesHref);
                     var blogPost = parsed as KsxBlogPost;
 
                     if (blogPost != null)
                     {
                         File.WriteAllText(
-                            Path.Combine(postsFolder, blogPost.NewSlug + ".md"), 
+                            Path.Combine(postsFolder, blogPost.NewSlug + ".md"),
                             blogPost.ToString(),
                             encoding);
-                        
-                        allComments.AddRange(blogPost.Comments);
+
+                        comments.AddPost(blogPost);
                     }
 
                     var page = parsed as KsxPage;
                     if (page != null)
                     {
                         File.WriteAllText(
-                            Path.Combine(baseFolder, page.Slug + ".md"), 
+                            Path.Combine(baseFolder, page.Slug + ".md"),
                             page.ToString(),
                             encoding);
                     }
 
-                    // TODO: Copy images     
-
                     var problems = string.Join(Environment.NewLine, parsed.Problems);
 
                     Console.WriteLine(
-                        "Converted: " + file.FileInfo.Name 
+                        "Converted: " + file.FileInfo.Name
                         + (string.IsNullOrEmpty(problems) ? "" : Environment.NewLine + problems));
                 });
 
-            // TODO: Output comments.xml for disqus use  
-            foreach (var comment in allComments)
+            // Output comments as Disqus XML format to be imported to Disqus 
+            comments.Write(Path.Combine(baseFolder, "import-me-to-disqus.xml"));
+
+            // Copy all image galleries
+            var sourceGalleries = SourceImageGalleries
+                .Select(d => Directory.EnumerateDirectories(Path.Combine(source, d)).ToList())
+                .SelectMany(dlist => dlist);
+                
+            foreach (var imageGallery in sourceGalleries)
             {
-                Console.WriteLine("{0} {1}", comment.When, comment.Who);
+                CopyDirectory(imageGallery, imagesFolder);
             }
 
             Console.WriteLine("\r\nDone, press ENTER to exit");
             Console.ReadLine();
+        }
+
+        private static void CopyDirectory(string source, string target)
+        {
+            var dir = new DirectoryInfo(source);
+            var targetDirectory = Path.Combine(target, dir.Name);
+
+            if (!Directory.Exists(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            foreach (var f in dir.GetFiles())
+            {
+                f.CopyTo(Path.Combine(targetDirectory, f.Name), false);
+            }
+
+            // Recursively copy all subdirectories
+            foreach (var subdirectory in dir.GetDirectories())
+            {
+                Program.CopyDirectory(subdirectory.FullName, targetDirectory);
+            }
         }
 
         static IEnumerable<SourceDocument> EnumerateFiles(string folder)
