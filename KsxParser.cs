@@ -69,6 +69,7 @@ namespace KsxWebsiteToJekyll
                 document.QuerySelector("#layout-main").InnerHtml
                     .StripHeaderAndFooterFromContent()
                     .ConvertToMarkdown()
+                    .EnableMarkdownInsideImageGalleries()
                     .ReplaceImagePaths(sourceImageGalleries, "/images");
 
             // Parse tags
@@ -142,6 +143,12 @@ namespace KsxWebsiteToJekyll
             }
 
             return outputString;
+        }
+
+        static string EnableMarkdownInsideImageGalleries(this string markdownContent)
+        {
+            return markdownContent.Replace("<div class=\"image-gallery\">",
+                "<div class=\"image-gallery\" markdown=\"1\">");
         }
 
         static string ReplaceImagePaths(this string markdownContent, IEnumerable<string> sourceImageGalleries, string newImageFolder)
